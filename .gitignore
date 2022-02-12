@@ -1,0 +1,4 @@
+# ignore binaries
+*.out
+
+#pretty much it
