@@ -1,2 +1,3 @@
-make: main.c
-     gcc main.c -lncurses -pthread -Ofast -oTetris.out
+all:
+	gcc -lncurses -pthread -Ofast -o Tetris.out main.c
+.PHONY: all
