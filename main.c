@@ -261,8 +261,9 @@ bool hasHeld;
 int score;
 int rotation;
 int frameNo = 0; //increments to 59 then back to 0
-int tetronimoIndex = 0;
-int tetronimoQueue[7] = {
+//bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
+int tIndex = 0;
+int tQueue[7] = {
     0,
     1,
     2,
@@ -271,6 +272,25 @@ int tetronimoQueue[7] = {
     5,
     6
 };
+int tQueueNext[7] = {
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+};
+
+
+void shuffle(int *array, int size) {
+    for (int i = 0; i < size-1; ++i) {
+        int j = rand() % (size-i) + i;
+        int temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}
 
 bool checkTransform(int y, int x, int rotation, int block) {
     //for (int i = 0; i < 4; i++) {
@@ -297,8 +317,8 @@ bool checkTransform(int y, int x, int rotation, int block) {
 void lock() { //locks the currently active tetronimo to the board and does other things
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            if ((*ref[tetronimoQueue[tetronimoIndex]])[rotation][i][j] != 0) {
-                board[i+y][j+x] = (*ref[tetronimoQueue[tetronimoIndex]])[rotation][i][j];
+            if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                board[i+y][j+x] = (*ref[tQueue[tIndex]])[rotation][i][j];
             }
         }
     }
@@ -311,8 +331,9 @@ void lock() { //locks the currently active tetronimo to the board and does other
         int c = 0;
         for (int j = 0; j < 10; j++) {
             if (board[i+y][j] != 0) {
-                if (i+y < 4) {
+                if (i+y < 3) {
                     stop = 1;
+                    return;
                 }
                 c++;
             }
@@ -350,15 +371,13 @@ void lock() { //locks the currently active tetronimo to the board and does other
     rotation = 0;
     y = 0;
     x = 3;
-    if (tetronimoIndex == 0) {
+    if (tIndex == 6) {
         for (int i = 0; i < 7; i++) {
-            int t = tetronimoQueue[i];
-            int r = (rand() % 7);
-            tetronimoQueue[i] = tetronimoQueue[r];
-            tetronimoQueue[r] = t;
+            tQueue[i] = tQueueNext[i];
         }
+        shuffle(tQueueNext, 7);
     }
-    tetronimoIndex = (tetronimoIndex+1)%7;
+    tIndex = (tIndex+1)%7;
 
     //tetronimo = rand() % 7;
     
@@ -370,20 +389,22 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     //box(rwin, 0, 0);
 
     //preview insta drop
-    for (int e = y; e < 24; e++) {
-        if (checkTransform(e, x, rotation, tetronimoQueue[tetronimoIndex])) {
-            continue;
-        } else {
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    if ((*ref[tetronimoQueue[tetronimoIndex]])[rotation][i][j] != 0) {
-                        wattron(win, COLOR_PAIR(tetronimoQueue[tetronimoIndex]+1));
-                        mvwaddch(win, e+i, x+j+1, '.');
-                        wattroff(win, COLOR_PAIR(tetronimoQueue[tetronimoIndex]+1));
+    if (stop == 0) {
+        for (int e = y; e < 24; e++) {
+            if (checkTransform(e, x, rotation, tQueue[tIndex])) {
+                continue;
+            } else {
+                for (int i = 0; i < 4; i++) {
+                    for (int j = 0; j < 4; j++) {
+                        if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                            wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                            mvwaddch(win, e+i, x+j+1, '.');
+                            wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                        }
                     }
                 }
+                break;
             }
-            break;
         }
     }
     wattron(win, COLOR_PAIR(6));
@@ -402,10 +423,10 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     }
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            if ((*ref[tetronimoQueue[tetronimoIndex]])[rotation][i][j] != 0) {
-                wattron(win, COLOR_PAIR(tetronimoQueue[tetronimoIndex]+1));
-                mvwaddch(win, y+1+i, x+1+j, charRef[tetronimoQueue[tetronimoIndex]]);
-                wattroff(win, COLOR_PAIR(tetronimoQueue[tetronimoIndex]+1));
+            if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
+                wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
             }
         }
     }
@@ -436,10 +457,17 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     mvwaddstr(rwin, 4, 2, "Next:");
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            if ((*ref[tetronimoQueue[tetronimoIndex+1]])[0][i][j] != 0) {
-                wattron(rwin, COLOR_PAIR(tetronimoQueue[tetronimoIndex+1]+1));
-                mvwaddch(rwin, i+5, j+3, charRef[tetronimoQueue[tetronimoIndex+1]]);
-                wattroff(rwin, COLOR_PAIR(tetronimoQueue[tetronimoIndex+1]+1));
+            int nextTetramino;
+            //printf("%i\n", tIndex);
+            if (tIndex == 6) {
+                nextTetramino = tQueueNext[0];
+            } else {
+                nextTetramino = tQueue[tIndex+1];
+            }
+            if ((*ref[nextTetramino])[0][i][j] != 0) {
+                wattron(rwin, COLOR_PAIR(nextTetramino+1));
+                mvwaddch(rwin, i+5, j+3, charRef[nextTetramino]);
+                wattroff(rwin, COLOR_PAIR(nextTetramino+1));
             } else {
                 mvwaddch(rwin, i+5, j+3, ' ');
             }
@@ -463,26 +491,37 @@ void *mainThread() {
     hold = -1;
     height = 24;
     width = 10;
-    starty = (LINES - height) / 2;	/* Calculating for a center placement */
-    startx = (COLS - width) / 2;	/* of the window		*/
-    win = newwin(height+2, width+2, starty+1, startx+1);
-    lwin = newwin(9, 7, starty+1, startx-9);
-    rwin = newwin(15, 10, starty+1, startx+width+3);
+    starty = (0);//(LINES - height) / 2;	/* Calculating for a center placement */
+    startx = (COLS - width) / 2;//(COLS - width) / 2;	/* of the window		*/
+    win = newwin(height+2, width+2, starty, startx);
+    lwin = newwin(9, 7, starty, startx-9);
+    rwin = newwin(15, 10, starty, startx+width+1);
     //tetronimo = rand() % 7;
-    for (int i = 0; i < 7; i++) {
-        int t = tetronimoQueue[i];
-        int r = (rand() % 7);
-        tetronimoQueue[i] = tetronimoQueue[r];
-        tetronimoQueue[r] = t;
-    }
+
+    shuffle(tQueue, 7);
+    shuffle(tQueueNext, 7);
+    //endwin();
+    //for (int i = 0; i < 7; i++) {
+    //    printf("%i\n", tQueue[i]);
+    //}
+    //printf("\n\n");
+    //for (int i = 0; i < 7; i++) {
+    //    printf("%i\n", tQueueNext[i]);
+    //}
+//
+    //return 0;
+
     //refreshboard();
 
     while (stop == 0) { //actual game code goes here
 
         usleep(16667);
         frameNo = (frameNo+1)%60;
-        
-
+        //score+=1000000;
+        //score = COLS;
+        //startx = (COLS - width) / 2;
+        //printf("%i\n", mvwin(win, 0, (COLS - width) / 2));
+        //mvwin(win, 0, (COLS - width) / 2);
 
     
         //refreshboard();
@@ -494,7 +533,7 @@ void *mainThread() {
         ch = chBuff[0];
 
         if (frameNo == 59) {//check if on the bottom, if so then lock
-            if (checkTransform(y+1, x, rotation, tetronimoQueue[tetronimoIndex])) {
+            if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                 y++;
             } else {
                 lock();
@@ -503,12 +542,12 @@ void *mainThread() {
         
         switch (ch) {
             case KEY_RIGHT: case 'd':
-                if (checkTransform(y, x+1, rotation, tetronimoQueue[tetronimoIndex])) {
+                if (checkTransform(y, x+1, rotation, tQueue[tIndex])) {
                     x++;
                 }
                 break;
             case KEY_LEFT: case 'a':
-                if (checkTransform(y, x-1, rotation, tetronimoQueue[tetronimoIndex])) {
+                if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
                     x--;
                 }
                 break;
@@ -516,7 +555,7 @@ void *mainThread() {
                 //rotate 
                 //y--;
                 for (int i = 0; i < 9; i++) {
-                    if (checkTransform(y+kicks[i][1], x+kicks[i][0], (rotation+1)%4, tetronimoQueue[tetronimoIndex])) {
+                    if (checkTransform(y+kicks[i][1], x+kicks[i][0], (rotation+1)%4, tQueue[tIndex])) {
                         rotation = (rotation+1)%4;
                         y += kicks[i][1];
                         x += kicks[i][0];
@@ -526,8 +565,9 @@ void *mainThread() {
                 break;
             case KEY_DOWN: case 's'://maybe add lock code here
                 //move down
-                if (checkTransform(y+1, x, rotation, tetronimoQueue[tetronimoIndex])) {
+                if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                     y++;
+                    frameNo = 0;
                     score++;
                 } else {
                     lock();
@@ -536,7 +576,7 @@ void *mainThread() {
             case ' ':
                 //instant drop
                 for (int i = y; i < 24; i++) {
-                    if (checkTransform(i, x, rotation, tetronimoQueue[tetronimoIndex])) {
+                    if (checkTransform(i, x, rotation, tQueue[tIndex])) {
                         continue;
                     } else {
                         score = score + (i-y)*2;
@@ -554,21 +594,18 @@ void *mainThread() {
                     rotation = 0;
                     if (hold != -1) {
                         int tempHold = hold;
-                        hold = tetronimoQueue[tetronimoIndex];
-                        tetronimoQueue[tetronimoIndex] = tempHold;
+                        hold = tQueue[tIndex];
+                        tQueue[tIndex] = tempHold;
                     } else {
-                        hold = tetronimoQueue[tetronimoIndex];
+                        hold = tQueue[tIndex];
                         //do same reinit stuff as in lock:
-                        hasHeld = 0;
-                        if (tetronimoIndex == 0) {
+                        //hasHeld = 0;
+                        if (tIndex == 6) {
                             for (int i = 0; i < 7; i++) {
-                                int t = tetronimoQueue[i];
-                                int r = (rand() % 7);
-                                tetronimoQueue[i] = tetronimoQueue[r];
-                                tetronimoQueue[r] = t;
-                            }
+                                tQueue[i] = tQueueNext[i];
+                            }shuffle(tQueueNext, 7);
                         }
-                        tetronimoIndex = (tetronimoIndex+1)%7;
+                        tIndex = (tIndex+1)%7;
                     }
                 }
 
@@ -586,6 +623,14 @@ void *mainThread() {
             chBuff[i] = chBuff[i+1];
         }
     }
+
+    //code after it ends
+    refreshboard();
+    sleep(2);
+    endwin();
+
+    printf("Your score was %i.\n", score);
+
     return NULL;
 }
 /*
@@ -598,7 +643,7 @@ void *mainThread() {
 {'b', 'c', 'd', 'e'}  -> 'a' (+ 'd', 'e', 'f')
 */
 void *inputThread() {
-    while (1) {
+    while (stop == 0) {
         int ch;
         ch = getch();//simple but effective
         for (int i=0; i < 4; i++) {
@@ -611,11 +656,8 @@ void *inputThread() {
     return NULL;
 };
 
-void update() {
-}
-
 int main() {
-    srand(time(0));
+    srand(time(NULL));
 
     /*//initial test when making the ref variable; new to pointers
     for (int i = 0; i < 7; i++) {
