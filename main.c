@@ -260,6 +260,7 @@ int hold; //block being held
 bool hasHeld;
 int score;
 int rotation;
+int paused;
 int frameNo = 0; //increments to 59 then back to 0
 //bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
 int tIndex = 0;
@@ -474,6 +475,9 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
         }
     }
 
+    if (paused == 1) {
+        mvwaddstr(win, 12, 2, "<PAUSED>");
+    }
 
     //refresh();
     wrefresh(win);
@@ -514,8 +518,72 @@ void *mainThread() {
     //refreshboard();
 
     while (stop == 0) { //actual game code goes here
+        skip:
 
         usleep(16667);
+
+        ch = chBuff[0];
+
+        //remove from output buffer
+        for (int i = 0; i < 4; i++) {
+            chBuff[i] = chBuff[i+1];
+        }
+            //wclear(win);
+            //werase(win);
+            //wclear(stdscr);
+            //werase(stdscr);
+        refreshboard();
+
+        //i know its clunky but eh it still works\
+        (as in putting the check for r to recentre outside the switch)
+        if (ch == 'r') {
+            //refreshboard();
+            //height = 24;
+            //width = 10;
+            //starty = (0);
+            startx = (COLS - width) / 2;
+            mvwin(win, starty, startx);
+            wresize(win, height+2, width+2);
+            mvwin(lwin, starty, startx-9);
+            mvwin(rwin, starty, startx+width+1);
+            erase();
+            refreshboard();
+               //i was getting desperate to fix a visual bug at one point -v
+            //redrawwin(win);
+            //redrawwin(lwin);
+            //redrawwin(rwin);
+            //wclear(win);
+            //wclear(lwin);
+            //wclear(rwin);
+            //clear();
+            //werase(win);
+            //werase(lwin);
+            //werase(rwin);
+            //erase();
+            //wrefresh(win);
+            //wrefresh(lwin);
+            //wrefresh(rwin);
+            //refresh();
+            //wclear(win);
+            //wclear(lwin);
+            //wclear(rwin);
+            //clear();
+            //werase(win);
+            //werase(lwin);
+            //werase(rwin);
+            //erase();
+            //clear();
+            //refresh();
+        }
+
+        if (ch == 'p') {
+            //mvwin(win, 0, (COLS - width) / 2);
+            paused = (paused+1)%2;
+        }
+
+        if (paused) {
+            continue;
+        }
         frameNo = (frameNo+1)%60;
         //score+=1000000;
         //score = COLS;
@@ -524,13 +592,11 @@ void *mainThread() {
         //mvwin(win, 0, (COLS - width) / 2);
 
     
-        //refreshboard();
         //wclear(win);
         //box(win, 0, 0);
         //mvwaddch(win, y+1, x+1, ' ');
         
-        refreshboard();
-        ch = chBuff[0];
+        //refreshboard();
 
         if (frameNo == 59) {//check if on the bottom, if so then lock
             if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
@@ -541,6 +607,16 @@ void *mainThread() {
         }
         
         switch (ch) {
+            //case 'x'://recentre everything
+            //    clear();
+            //    height = 24;
+            //    width = 10;
+            //    starty = (0);
+            //    startx = (COLS - width) / 2;
+            //    mvwin(win, starty, startx);
+            //    mvwin(lwin, starty, startx-9);
+            //    mvwin(rwin, starty, startx+width+1);
+            //    break;
             case KEY_RIGHT: case 'd':
                 if (checkTransform(y, x+1, rotation, tQueue[tIndex])) {
                     x++;
@@ -608,6 +684,7 @@ void *mainThread() {
                         tIndex = (tIndex+1)%7;
                     }
                 }
+                break;
 
         }
         
@@ -618,10 +695,6 @@ void *mainThread() {
         //mvwaddch(win, y+1, x+1, 3);
         
 
-        //remove from output buffer
-        for (int i = 0; i < 4; i++) {
-            chBuff[i] = chBuff[i+1];
-        }
     }
 
     //code after it ends
@@ -629,7 +702,6 @@ void *mainThread() {
     sleep(2);
     endwin();
 
-    printf("Your score was %i.\n", score);
 
     return NULL;
 }
@@ -710,5 +782,9 @@ int main() {
     //this code will only be reached once the game stops
 
     endwin();
+    usleep(500000);
+    printf("\n\n\n\n\n\n      Your score was %i.\n\n\nPress any key to continue...", score);
+    usleep(500000);
+    getch();
     return 0;
 }
