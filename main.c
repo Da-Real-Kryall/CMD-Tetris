@@ -268,7 +268,7 @@ int paused;
 int frameNo = 0; //increments to 59 then back to 0
 //bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
 int tIndex = 0;
-int numLines = 100;
+int numLines = 0;
 int tQueue[7] = {
     0,
     1,
