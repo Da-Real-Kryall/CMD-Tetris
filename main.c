@@ -263,11 +263,12 @@ int hold; //block being held
 bool hasHeld;
 int score = 0;
 int rotation;
+bool lockDelay;
 int paused;
 int frameNo = 0; //increments to 59 then back to 0
 //bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
 int tIndex = 0;
-int numLines = 0;
+int numLines = 100;
 int tQueue[7] = {
     0,
     1,
@@ -472,9 +473,13 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                if (lockDelay == 1) {
+                    wattron(win, A_BOLD);
+                }
                 wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
                 mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
                 wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                wattroff(win, A_BOLD);
             }
         }
     }
@@ -563,8 +568,8 @@ void *mainThread() {
     //score = 1234567890;
     height = 24;
     width = 10;
-    starty = (LINES - height) / 2 - 1;	/* Calculating for a center placement */
-    startx = (COLS - width) / 2 - 1;//(COLS - width) / 2;	/* of the window		*/
+    starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;	/* Calculating for a center placement */
+    startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;//(COLS - width) / 2;	/* of the window		*/
     win = newwin(height+2, width+2, starty, startx);
     lwin = newwin(5, 6, starty, startx-6);
     nwin = newwin(13, 6, starty, startx+width+2);
@@ -610,8 +615,8 @@ void *mainThread() {
             //height = 24;
             //width = 10;
             //starty = (0);
-            starty = (LINES - height) / 2 - 1;
-            startx = (COLS - width) / 2 - 1;
+            starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;
+            startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;
             mvwin(win, starty, startx);
             wresize(win, height+2, width+2);
             mvwin(lwin, starty, startx-6);
@@ -672,8 +677,14 @@ void *mainThread() {
         if (frameNo == grav-1) {//check if on the bottom, if so then lock
             if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                 y++;
+                lockDelay = 0;
             } else {
-                lock();
+                if (lockDelay == 1) {
+                    lock();
+                    lockDelay = 0;
+                } else {
+                    lockDelay = 1;
+                }
             }
         }
         
@@ -715,6 +726,7 @@ void *mainThread() {
                 if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                     y++;
                     frameNo = 0;
+                    lockDelay = 0;
                     score++;
                 } else {
                     lock();
