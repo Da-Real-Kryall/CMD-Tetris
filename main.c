@@ -253,17 +253,21 @@ char board[24][10] = {0}; //the game board, 24*10 but the top 4 lines arent visi
 int startx, starty, width, height;
 WINDOW *win;
 WINDOW *lwin; //for hold
-WINDOW *rwin; //for next and score
+WINDOW *nwin; //for next
+WINDOW *swin; //for score and level
 int chBuff[5] = {0};
 int x, y;
+int level;
+int grav = 60;
 int hold; //block being held
 bool hasHeld;
-int score;
+int score = 0;
 int rotation;
 int paused;
 int frameNo = 0; //increments to 59 then back to 0
 //bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
 int tIndex = 0;
+int numLines = 0;
 int tQueue[7] = {
     0,
     1,
@@ -281,6 +285,39 @@ int tQueueNext[7] = {
     4,
     5,
     6
+};
+
+int levelGravity[30] = {
+    60,
+    53,
+    49,
+    45,
+    41,
+    37,
+    33,
+    28,
+    22,
+    17,
+    11,
+    10,
+    9,
+    8,
+    7,
+    6,
+    6,
+    5,
+    5,
+    4,
+    4,
+    3,
+    3,
+    3,
+    2,
+    2,
+    2,
+    1,
+    1,
+    1
 };
 
 
@@ -327,7 +364,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
     //remove filled lines:
 
 
-    int d = 0;
+    //int numLines = 0;
     for (int i = 0; i < 4; i++) {
         int c = 0;
         for (int j = 0; j < 10; j++) {
@@ -340,7 +377,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
             }
         }
         if (c == 10) {//clear line
-            d++;
+            numLines++;
             for (int k = (i+y); k > 2; k--) {
                 for (int j = 0; j < 10; j++) {
                     board[k][j] = board[k-1][j];
@@ -348,22 +385,29 @@ void lock() { //locks the currently active tetronimo to the board and does other
             }
         }
     }
-    switch (d) {
-        case 1:
-            score = score + 40;
-            break;
-        case 2:
-            score = score + 100;
-            break;
-        case 3:
-            score = score + 300;
-            break;
-        case 4:
-            score = score + 1200;
-            break;
+
+    level = (numLines/10);
+
+    if (level > 29) {
+        grav = 1;
+    } else {
+        grav = levelGravity[level];
     }
 
-
+    switch (numLines) {//yet to add perfect clears
+        case 1:
+            score += 100*(level+1);
+            break;
+        case 2:
+            score += 300*(level+1);
+            break;
+        case 3:
+            score += 500*(level+1);
+            break;
+        case 4:
+            score += 800*(level+1); //'difficult'
+            break;
+    }
 
 
 
@@ -387,7 +431,10 @@ void lock() { //locks the currently active tetronimo to the board and does other
 void refreshboard() { //prints everything     ~~prints the currently saved board, NOT the currently active tetronimo~~
     werase(win);
     box(win, 0, 0);
-    //box(rwin, 0, 0);
+    box(nwin, 0, 0);
+    box(lwin, 0, 0);
+    //box(swin, 0, 0);
+
 
     //preview insta drop
     if (stop == 0) {
@@ -398,9 +445,9 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
                 for (int i = 0; i < 4; i++) {
                     for (int j = 0; j < 4; j++) {
                         if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
-                            wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                            //wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
                             mvwaddch(win, e+i, x+j+1, '.');
-                            wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                            //wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
                         }
                     }
                 }
@@ -432,45 +479,63 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
         }
     }
 
-    //score display
-    mvwaddstr(rwin, 1, 2, "Score:");
-    mvwprintw(rwin, 2, 2, "%i", score);
-    //mvwprintw(rwin, 3, 2, "%i", hold);
+    //mvwaddstr(swin, 3, 1, "Score:");
+   // mvwprintw(swin, 4, 1, "%i", score);
+    //mvwprintw(nwin, 3, 2, "%i", hold);
+    
+    //level
+    mvwaddstr(swin, 1, 1, "LEVEL:");
+    mvwprintw(swin, 2, 1, "%i", level+1);
 
+    //score display
+    mvwaddstr(swin, 4, 1, "SCORE:");
+    mvwprintw(swin, 5, 1, "%i", score);
+
+    
     //hold
     //mvaddstr(starty+2, startx+width+4, "hold:");
-    mvwaddstr(lwin, 1, 2, "Hold:");
+    mvwaddstr(lwin, 0, 1, "HOLD");
     if (hold != -1) {
-        for (int i = 0; i < 4; i++) {
+        int r = 1;
+        if (hold == 1 || hold == 0) {
+            r = 0;
+        }
+        for (int i = 1; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
-                if ((*ref[hold])[0][i][j] != 0) {
+                if ((*ref[hold])[r][(i-1+r)%4][j] != 0) {
                     wattron(lwin, COLOR_PAIR(hold+1));
-                    mvwaddch(lwin, i+2, j+3, charRef[hold]);
+                    mvwaddch(lwin, i, j+1, charRef[hold]);
                     wattroff(lwin, COLOR_PAIR(hold+1));
                 } else {
-                    mvwaddch(lwin, i+2, j+3, ' ');
+                    mvwaddch(lwin, i, j+1, ' ');
                 }
             }
         }
     }
 
     //next block
-    mvwaddstr(rwin, 4, 2, "Next:");
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            int nextTetramino;
-            //printf("%i\n", tIndex);
-            if (tIndex == 6) {
-                nextTetramino = tQueueNext[0];
-            } else {
-                nextTetramino = tQueue[tIndex+1];
-            }
-            if ((*ref[nextTetramino])[0][i][j] != 0) {
-                wattron(rwin, COLOR_PAIR(nextTetramino+1));
-                mvwaddch(rwin, i+5, j+3, charRef[nextTetramino]);
-                wattroff(rwin, COLOR_PAIR(nextTetramino+1));
-            } else {
-                mvwaddch(rwin, i+5, j+3, ' ');
+    mvwaddstr(nwin, 0, 1, "NEXT"); //display next 3 blocks
+    for (int k = 0; k < 3; k++) {
+        for (int i = 1; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                int nextTetramino;
+                int r = 1;
+                //printf("%i\n", tIndex);
+                if (tIndex+k >= 6) {
+                    nextTetramino = tQueueNext[(tIndex+k)%6];
+                } else {
+                    nextTetramino = tQueue[(tIndex+k)+1];
+                }
+                if (nextTetramino == 1 || nextTetramino == 0) {
+                    r = 0;
+                }
+                if ((*ref[nextTetramino])[r][(i-1+r)%4][j] != 0) {
+                    wattron(nwin, COLOR_PAIR(nextTetramino+1));
+                    mvwaddch(nwin, i+4*k, j+1, charRef[nextTetramino]);
+                    wattroff(nwin, COLOR_PAIR(nextTetramino+1));
+                } else {
+                    mvwaddch(nwin, i+4*k, j+1, ' ');
+                }
             }
         }
     }
@@ -481,8 +546,9 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
 
     //refresh();
     wrefresh(win);
-    wrefresh(rwin);
+    wrefresh(nwin);
     wrefresh(lwin);
+    wrefresh(swin);
 
 
 }
@@ -492,14 +558,17 @@ void *mainThread() {
     x = 3;
     int ch;
     rotation = 0;
+    level = 0;
     hold = -1;
+    //score = 1234567890;
     height = 24;
     width = 10;
-    starty = (0);//(LINES - height) / 2;	/* Calculating for a center placement */
-    startx = (COLS - width) / 2;//(COLS - width) / 2;	/* of the window		*/
+    starty = (LINES - height) / 2 - 1;	/* Calculating for a center placement */
+    startx = (COLS - width) / 2 - 1;//(COLS - width) / 2;	/* of the window		*/
     win = newwin(height+2, width+2, starty, startx);
-    lwin = newwin(9, 7, starty, startx-9);
-    rwin = newwin(15, 10, starty, startx+width+1);
+    lwin = newwin(5, 6, starty, startx-6);
+    nwin = newwin(13, 6, starty, startx+width+2);
+    swin = newwin(6, 7, starty+12, startx+width+1);
     //tetronimo = rand() % 7;
 
     shuffle(tQueue, 7);
@@ -541,36 +610,38 @@ void *mainThread() {
             //height = 24;
             //width = 10;
             //starty = (0);
-            startx = (COLS - width) / 2;
+            starty = (LINES - height) / 2 - 1;
+            startx = (COLS - width) / 2 - 1;
             mvwin(win, starty, startx);
             wresize(win, height+2, width+2);
-            mvwin(lwin, starty, startx-9);
-            mvwin(rwin, starty, startx+width+1);
+            mvwin(lwin, starty, startx-6);
+            mvwin(nwin, starty, startx+width+2);
+            mvwin(swin, starty+12, startx+width+1);
             erase();
             refreshboard();
-               //i was getting desperate to fix a visual bug at one point -v
+               //i was getting desperate to fix a visual bug at one point -\v
             //redrawwin(win);
             //redrawwin(lwin);
-            //redrawwin(rwin);
+            //redrawwin(nwin);
             //wclear(win);
             //wclear(lwin);
-            //wclear(rwin);
+            //wclear(nwin);
             //clear();
             //werase(win);
             //werase(lwin);
-            //werase(rwin);
+            //werase(nwin);
             //erase();
             //wrefresh(win);
             //wrefresh(lwin);
-            //wrefresh(rwin);
+            //wrefresh(nwin);
             //refresh();
             //wclear(win);
             //wclear(lwin);
-            //wclear(rwin);
+            //wclear(nwin);
             //clear();
             //werase(win);
             //werase(lwin);
-            //werase(rwin);
+            //werase(nwin);
             //erase();
             //clear();
             //refresh();
@@ -584,7 +655,7 @@ void *mainThread() {
         if (paused) {
             continue;
         }
-        frameNo = (frameNo+1)%60;
+        frameNo = (frameNo+1)%grav;
         //score+=1000000;
         //score = COLS;
         //startx = (COLS - width) / 2;
@@ -598,7 +669,7 @@ void *mainThread() {
         
         //refreshboard();
 
-        if (frameNo == 59) {//check if on the bottom, if so then lock
+        if (frameNo == grav-1) {//check if on the bottom, if so then lock
             if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                 y++;
             } else {
@@ -615,7 +686,7 @@ void *mainThread() {
             //    startx = (COLS - width) / 2;
             //    mvwin(win, starty, startx);
             //    mvwin(lwin, starty, startx-9);
-            //    mvwin(rwin, starty, startx+width+1);
+            //    mvwin(nwin, starty, startx+width+1);
             //    break;
             case KEY_RIGHT: case 'd':
                 if (checkTransform(y, x+1, rotation, tQueue[tIndex])) {
