@@ -505,7 +505,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
         grav = levelGravity[level];
     }
 
-    switch (numLines) {//yet to add perfect clears
+    switch (d) {//yet to add perfect clears
         case 1:
             score += 100*(level+1);
             break;
