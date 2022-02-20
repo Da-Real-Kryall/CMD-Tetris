@@ -224,17 +224,88 @@ char (*ref[7])[4][4][4] = {
     &L
 };
 
-int kicks[9][2] = { //x,-y
-    {0,0},
-    {1,0},
-    {-1,0},
-    {0,1},
-    {1,1},
-    {-1,1},
-    {0,-1},
-    {1,-1},
-    {-1,-1}
+int normKicks[4][5][2] = {//index is the initial state of rotation before rotating 90° clockwise (also given as x, -y)
+    {
+        {0,0},
+        {-1,0},
+        {-1,-1},
+        {0,2},
+        {-1,2}
+    },
+    {
+        {0,0},
+        {1,0},
+        {1,1},
+        {0,-2},
+        {1,-2}
+    },
+    {
+        {0,0},
+        {1,0},
+        {1,-1},
+        {0,2},
+        {1,2}
+    },
+    {
+        {0,0},
+        {-1,0},
+        {-1,1},
+        {0,-2},
+        {-1,-2}
+    }
 };
+int iKicks[4][5][2] = {
+    {
+        {0,0},
+        {-2,0},
+        {1,0},
+        {-2,1},
+        {1,-2}
+    },
+    {
+        {0,0},
+        {-1,0},
+        {2,0},
+        {-1,-2},
+        {2,1}
+    },
+    {
+        {0,0},
+        {2,0},
+        {-1,0},
+        {2,-1},
+        {-1,2}
+    },
+    {
+        {0,0},
+        {1,0},
+        {-2,0},
+        {1,2},
+        {-2,-1}
+    }
+};
+
+int (*kickTable[7])[4][5][2] = {
+    &iKicks,
+    &normKicks,
+    &normKicks,
+    &normKicks,
+    &normKicks,
+    &normKicks,
+    &normKicks
+};
+
+//int kicks[9][2] = { //x,-y
+//    {0,0},
+//    {1,0},
+//    {-1,0},
+//    {0,1},
+//    {1,1},
+//    {-1,1},
+//    {0,-1},
+//    {1,-1},
+//    {-1,-1}
+//};
 
 /*
      1     I     @    Cyan
@@ -263,12 +334,14 @@ int hold; //block being held
 bool hasHeld;
 int score = 0;
 int rotation;
-bool lockDelay;
+int lockDelay;
+int lockMoves;
 int paused;
+int rot; //1 if last move was a rotation, 2 if there was also a kick. for t spin recognition.
 int frameNo = 0; //increments to 59 then back to 0
 //bool altQueue = 0;//wether we are reading the first or second half of the tetromino queue
 int tIndex = 0;
-int numLines = 0;
+int numLines = 0; //using variable goal levelling, also the var name is kinda misleading; this refers to the point goal for levelling up
 int tQueue[7] = {
     0,
     1,
@@ -366,6 +439,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
 
 
     //int numLines = 0;
+    int d = 0;
     for (int i = 0; i < 4; i++) {
         int c = 0;
         for (int j = 0; j < 10; j++) {
@@ -378,16 +452,52 @@ void lock() { //locks the currently active tetronimo to the board and does other
             }
         }
         if (c == 10) {//clear line
-            numLines++;
+            d++;
             for (int k = (i+y); k > 2; k--) {
                 for (int j = 0; j < 10; j++) {
                     board[k][j] = board[k-1][j];
                 }
             }
         }
+    } //numlines doesnt roll over when levelling up
+    switch (d) {
+        case 1:
+            numLines += 1;
+            break;
+        case 2:
+            numLines += 3;
+            break;
+        case 3:
+            numLines += 5;
+            break;
+        case 4:
+            numLines += 8;
+            break;
     }
 
-    level = (numLines/10);
+    if (numLines >= ((level+1) * 5)) {
+        numLines = 0;
+        level++;
+    }
+
+        //{0, 0, 0, 0},
+        //{0, 3, 0, 0},
+        //{0, 3, 3, 0},
+        //{0, 3, 0, 0}
+    //int t_multiplier = 0;
+    //check if a t-spin has happened
+    if (tQueue[tIndex] == 2 && rot != 0) {//check if block is a t and the last action was a rotation
+        if (((board[y+1][x] != 0) + (board[y+1][x+2] != 0) + (board[y+3][x] != 0) + (board[y+3][x+2] != 0)) >= 3) {
+            //now award points
+            if (rot == 1) {//no kick
+                score += 200*(level+1);
+            } else {//with kick
+                score += 400*(level+1);
+            }
+        }
+    }
+
+    //level = (numLines/10);
 
     if (level > 29) {
         grav = 1;
@@ -414,7 +524,11 @@ void lock() { //locks the currently active tetronimo to the board and does other
 
     //do reinit stuff:
     hasHeld = 0;
+    frameNo = 0;
+    lockDelay = 0;
+    lockMoves = 0;
     rotation = 0;
+    rot = 0;
     y = 0;
     x = 3;
     if (tIndex == 6) {
@@ -473,7 +587,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
-                if (lockDelay == 1) {
+                if (lockDelay != 0) {
                     wattron(win, A_BOLD);
                 }
                 wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
@@ -490,7 +604,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     
     //level
     mvwaddstr(swin, 1, 1, "LEVEL:");
-    mvwprintw(swin, 2, 1, "%i", level+1);
+    mvwprintw(swin, 2, 1, "%i", level+1);//level+1);
 
     //score display
     mvwaddstr(swin, 4, 1, "SCORE:");
@@ -578,6 +692,7 @@ void *mainThread() {
 
     shuffle(tQueue, 7);
     shuffle(tQueueNext, 7);
+    shuffle(tQueue, 7); //second time to remove the predictibility of RNG in first few frames of gameplay, otherwise the game would always start with the same piece usually
     //endwin();
     //for (int i = 0; i < 7; i++) {
     //    printf("%i\n", tQueue[i]);
@@ -592,7 +707,6 @@ void *mainThread() {
     //refreshboard();
 
     while (stop == 0) { //actual game code goes here
-        skip:
 
         usleep(16667);
 
@@ -678,17 +792,24 @@ void *mainThread() {
             if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                 y++;
                 lockDelay = 0;
-            } else {
-                if (lockDelay == 1) {
-                    lock();
-                    lockDelay = 0;
-                } else {
+                lockMoves = 0;
+                if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                     lockDelay = 1;
                 }
             }
+            // else if (lockDelay == 0) {
+            //    lockDelay = 1;
+            //}
+        }
+
+        if (lockDelay >= 30) {
+            lock();
+        } else if (lockDelay != 0) {
+            lockDelay++;
         }
         
         switch (ch) {
+            int delta[2] = {0};
             //case 'x'://recentre everything
             //    clear();
             //    height = 24;
@@ -702,21 +823,113 @@ void *mainThread() {
             case KEY_RIGHT: case 'd':
                 if (checkTransform(y, x+1, rotation, tQueue[tIndex])) {
                     x++;
+                    rot = 0;
+                    lockDelay = 0;
+                    lockMoves++;
+
+                    if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                        if (lockMoves >= 15) {
+                            lock();
+                        } else {
+                            //x++;
+                            //frameNo = 0;
+                            //lockMoves++;
+                            frameNo = 0;
+                            lockDelay = 1;
+                        }
+                    }
                 }
                 break;
             case KEY_LEFT: case 'a':
                 if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
                     x--;
+                    rot = 0;
+                    lockDelay = 0;
+                    lockMoves++;
+
+                    if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                        if (lockMoves >= 15) {
+                            lock();
+                        } else {
+                            lockDelay = 1;
+                            frameNo = 0;
+                        }
+                    }
                 }
+                //if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
+                //    if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                //        if (lockMoves >= 15) {
+                //            lock();
+                //        } else {
+                //            x--;
+                //            lockMoves++;
+                //            lockDelay = 1;
+                //            frameNo = 0;
+                //        }
+                //    } else {
+                //        x--;
+                //        lockDelay = 0;
+                //        lockMoves++;
+                //    }
+                //}
+                //if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
+                //    if (lockMoves >= 15 && !checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                //        lock();
+                //        lockMoves = 0;
+                //    } else {
+                //        x--;
+                //        lockMoves++;
+                //    }
+                //    lockDelay = 0;
+                //}
                 break;
             case KEY_UP: case 'w':
                 //rotate 
                 //y--;
-                for (int i = 0; i < 9; i++) {
-                    if (checkTransform(y+kicks[i][1], x+kicks[i][0], (rotation+1)%4, tQueue[tIndex])) {
+                
+                for (int i = 0; i < 5; i++) {
+                    //(*kicks[block])[rotation][i]
+                    delta[0] = (*kickTable[tQueue[tIndex]])[rotation][i][0];
+                    delta[1] = (*kickTable[tQueue[tIndex]])[rotation][i][1];
+                    if (checkTransform(y+delta[1], x+delta[0], (rotation+1)%4, tQueue[tIndex])) {
                         rotation = (rotation+1)%4;
-                        y += kicks[i][1];
-                        x += kicks[i][0];
+                        y += delta[1];
+                        x += delta[0];
+                        
+                        if (delta[1] != 0 || delta[0] != 0) {
+                            rot = 2; //now eligible for a t-spin
+                        } else {
+                            rot = 1;
+                        }
+                        lockDelay = 0;
+                        lockMoves++;
+
+                        if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                            if (lockMoves >= 15) {
+                                lock();
+                            } else {
+                                lockDelay = 1;
+                                frameNo = 0;
+                            }
+                        }
+                        //if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                        //    if (lockMoves >= 15) {
+                        //        lock();
+                        //    } else {
+                        //        rotation = (rotation+1)%4;
+                        //        y += kicks[i][1];
+                        //        x += kicks[i][0];
+                        //        lockMoves++;
+                        //        lockDelay = 1;
+                        //        frameNo = 0;
+                        //    }
+                        //} else {
+                        //    rotation = (rotation+1)%4;
+                        //    y += kicks[i][1];
+                        //    x += kicks[i][0];
+                        //    lockDelay = 0;
+                        //    lockMoves++;
+                        //}
                         break;
                     }
                 }
@@ -725,8 +938,13 @@ void *mainThread() {
                 //move down
                 if (checkTransform(y+1, x, rotation, tQueue[tIndex])) {
                     y++;
+                    if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
+                        lockDelay = 1;
+                    } else {
+                        lockDelay = 0;
+                    }
                     frameNo = 0;
-                    lockDelay = 0;
+                    lockMoves = 0;
                     score++;
                 } else {
                     lock();
