@@ -458,6 +458,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
                     board[k][j] = board[k-1][j];
                 }
             }
+            
         }
     } //numlines doesnt roll over when levelling up
     switch (d) {
@@ -552,7 +553,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
 
 
     //preview insta drop
-    if (stop == 0) {
+    if (paused == 0) {
         for (int e = y; e < 24; e++) {
             if (checkTransform(e, x, rotation, tQueue[tIndex])) {
                 continue;
@@ -569,35 +570,41 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
                 break;
             }
         }
-    }
-    wattron(win, COLOR_PAIR(6));
-    for (int j = 0; j < 10; j++) {
-        mvwaddch(win, 3, j+1, '_');
-    }
-    wattroff(win, COLOR_PAIR(6));
-    for (int i = 0; i < 24; i++) {
+
+        wattron(win, COLOR_PAIR(6));
         for (int j = 0; j < 10; j++) {
-            if (board[i][j] != 0) {
-                wattron(win, COLOR_PAIR(board[i][j]));
-                mvwaddch(win, i+1, j+1, charRef[board[i][j]-1]);
-                wattroff(win, COLOR_PAIR(board[i][j]));
+            mvwaddch(win, 3, j+1, '_');
+        }
+        wattroff(win, COLOR_PAIR(6));
+        for (int i = 0; i < 24; i++) {
+            for (int j = 0; j < 10; j++) {
+                if (board[i][j] != 0) {
+                    //if (paused == 1) {
+                    //    mvwaddch(win, i+1, j+1, '#');
+                    //} else {
+                    wattron(win, COLOR_PAIR(board[i][j]));
+                    mvwaddch(win, i+1, j+1, charRef[board[i][j]-1]);
+                    wattroff(win, COLOR_PAIR(board[i][j]));
+                    //}
+                }
             }
         }
-    }
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
-                if (lockDelay != 0) {
-                    wattron(win, A_BOLD);
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                    if (lockDelay != 0) {
+                        wattron(win, A_BOLD);
+                    }
+                    wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                    mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
+                    wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                    wattroff(win, A_BOLD);
                 }
-                wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
-                mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
-                wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
-                wattroff(win, A_BOLD);
             }
         }
     }
 
+    
     //mvwaddstr(swin, 3, 1, "Score:");
    // mvwprintw(swin, 4, 1, "%i", score);
     //mvwprintw(nwin, 3, 2, "%i", hold);
@@ -621,7 +628,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
         }
         for (int i = 1; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
-                if ((*ref[hold])[r][(i-1+r)%4][j] != 0) {
+                if ((*ref[hold])[r][(i-1+r)%4][j] != 0 && paused == 0) {
                     wattron(lwin, COLOR_PAIR(hold+1));
                     mvwaddch(lwin, i, j+1, charRef[hold]);
                     wattroff(lwin, COLOR_PAIR(hold+1));
@@ -648,7 +655,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
                 if (nextTetramino == 1 || nextTetramino == 0) {
                     r = 0;
                 }
-                if ((*ref[nextTetramino])[r][(i-1+r)%4][j] != 0) {
+                if ((*ref[nextTetramino])[r][(i-1+r)%4][j] != 0 && paused == 0) {
                     wattron(nwin, COLOR_PAIR(nextTetramino+1));
                     mvwaddch(nwin, i+4*k, j+1, charRef[nextTetramino]);
                     wattroff(nwin, COLOR_PAIR(nextTetramino+1));
@@ -768,7 +775,31 @@ void *mainThread() {
 
         if (ch == 'p') {
             //mvwin(win, 0, (COLS - width) / 2);
-            paused = (paused+1)%2;
+            if (paused == 1) {
+                paused = 0;
+                //3
+                mvwaddstr(win, 12, 2, "   3..  ");
+                wrefresh(win);
+                usleep(400000);
+                mvwaddstr(win, 12, 5, "2..");
+                wrefresh(win);
+                //2
+                usleep(400000);
+                mvwaddstr(win, 12, 5, "1..");
+                wrefresh(win);
+                //1
+                usleep(400000);
+                mvwaddstr(win, 12, 5, "GO!");
+                wrefresh(win);
+                //go!
+                usleep(300000);
+                mvwaddstr(win, 12, 5, "   ");
+                wrefresh(win);
+                //<blank>
+            } else {
+                paused = 1;
+            }
+            //paused = (paused+1)%2;
         }
 
         if (paused) {
