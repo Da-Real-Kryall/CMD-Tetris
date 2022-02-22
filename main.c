@@ -1,6 +1,7 @@
 //tetris!!!
 
 #include <ncurses.h>
+#include <string.h> //for strcpy
 #include <pthread.h>
 #include <stdlib.h> //for rand()
 #include <unistd.h>  /* only for usleep() */
@@ -321,11 +322,38 @@ int (*kickTable[7])[4][5][2] = {
 //int ch; //current key that was pressed, might make this a buffer later
 bool stop; //wether the game has ended
 char board[24][10] = {0}; //the game board, 24*10 but the top 4 lines arent visible to the player
+//{
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//    {1, 1, 1, 1, 0, 0, 0, 1, 1, 1},
+//    {1, 1, 1, 1, 1, 0, 1, 1, 1, 1},
+//    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+//};
 int startx, starty, width, height;
 WINDOW *win;
 WINDOW *lwin; //for hold
 WINDOW *nwin; //for next
 WINDOW *swin; //for score and level
+WINDOW *fwin; //for feat list
 int chBuff[5] = {0};
 int x, y;
 int level;
@@ -394,6 +422,57 @@ int levelGravity[30] = {
     1
 };
 
+char featStrings[20][8]; //= {0}; //[countdown, type, score], appear for 1.5s
+int featLife[20] = {0};
+int featScores[20] = {0};
+//char featStrings[7][7] = {
+//    "Single\0",
+//    "Double\0",
+//    "Triple\0",
+//    "Tetris\0",
+//    "T-Spin\0",
+//    "T-Mini\0",
+//    "Pclear\0"
+//};
+
+void featUpdate() {
+    for (int i = 0; i < 20; i++) {
+        if (featLife[i] > 0) {
+            featLife[i]--;
+        }
+        if (featLife[i] == 0) {
+            strcpy(featStrings[i], "       \0");
+        }
+    }
+};
+
+void addFeat(int lines, char msg[], int fScore) {
+    for (int i = 0; i < 20-lines; i++) {
+        if (featLife[i] == 0) {
+            int reserveCheck = 0;
+            for (int j = 1; j < lines+1; j++) {
+                if (featLife[i+j] == 0) { //might be able to change 0 to 10 or something below 15
+                    reserveCheck++;
+                }
+            }
+            if (reserveCheck == lines) {
+                //now apply the data
+                char tempStr[7] = "       ";
+                for (int j = 0; j <= lines; j++) {
+                    for (int k = 0; k < 7; k++) {
+                        tempStr[k] = msg[k+(7*j)];
+                    }
+                    strcpy(featStrings[i+j], tempStr);
+                    featScores[i+j] = fScore;
+                    featLife[i+j] = 60;
+                }
+                //strcpy(featStrings[i], msg);
+                return;
+            }
+        }
+    }
+};
+
 
 void shuffle(int *array, int size) {
     for (int i = 0; i < size-1; ++i) {
@@ -427,6 +506,7 @@ bool checkTransform(int y, int x, int rotation, int block) {
 }
 
 void lock() { //locks the currently active tetronimo to the board and does other things
+    int scoreCase = 0;
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
@@ -435,8 +515,22 @@ void lock() { //locks the currently active tetronimo to the board and does other
         }
     }
     
-    //remove filled lines:
+    //check if a t-spin has happened
+    if (tQueue[tIndex] == 2 && rot != 0) {//check if block is a t and the last action was a rotation
+        if (((board[y+1][x] != 0) + (board[y+1][x+2] != 0) + (board[y+3][x] != 0) + (board[y+3][x+2] != 0)) >= 3) {
+            if (rot == 1) {//no kick
+                scoreCase += 10;//score += 200*(level+1); //mini t spin
+            } else {//with kick
+                scoreCase += 20;//score += 200*(level+1); //mini t spin
+                //score += 400*(level+1);
+                //endwin();
+                //level = 1000;
+            }
+            //level = scoreCase;
+        }
+    }
 
+    //remove filled lines:
 
     //int numLines = 0;
     int d = 0;
@@ -481,20 +575,26 @@ void lock() { //locks the currently active tetronimo to the board and does other
         level++;
     }
 
+    scoreCase += d;
         //{0, 0, 0, 0},
         //{0, 3, 0, 0},
         //{0, 3, 3, 0},
         //{0, 3, 0, 0}
     //int t_multiplier = 0;
-    //check if a t-spin has happened
-    if (tQueue[tIndex] == 2 && rot != 0) {//check if block is a t and the last action was a rotation
-        if (((board[y+1][x] != 0) + (board[y+1][x+2] != 0) + (board[y+3][x] != 0) + (board[y+3][x+2] != 0)) >= 3) {
-            //now award points
-            if (rot == 1) {//no kick
-                score += 200*(level+1);
-            } else {//with kick
-                score += 400*(level+1);
+    //if (tQueue[tIndex] == 2 && rot != 0) {
+    //    level = 1000*((board[y+1][x] != 0) + (board[y+1][x+2] != 0) + (board[y+3][x] != 0) + (board[y+3][x+2] != 0));
+    //}
+    if (d != 0) {
+        int e = 0;
+        for (int i = 0; i < 24; i++) {
+            for (int j = 0; j < 10; j++) {
+                if (board[i][j] != 0) {
+                    e = 1;
+                }
             }
+        }
+        if (e == 0) {
+            scoreCase += 100;
         }
     }
 
@@ -506,20 +606,92 @@ void lock() { //locks the currently active tetronimo to the board and does other
         grav = levelGravity[level];
     }
 
-    switch (d) {//yet to add perfect clears
-        case 1:
-            score += 100*(level+1);
+    int scoreGiven = 0; //in 100's
+
+    switch (scoreCase) {
+        case 1: //single
+            addFeat(1, "Single  +%i  \0", level+1);
+            scoreGiven += level+1;
             break;
-        case 2:
-            score += 300*(level+1);
+        case 2: //double
+            addFeat(1, "Double  +%i  \0", 3*(level+1));
+            scoreGiven += 3*(level+1);
             break;
-        case 3:
-            score += 500*(level+1);
+        case 3: //triple
+            addFeat(1, "Triple  +%i  \0", 5*(level+1));
+            scoreGiven += 5*(level+1);
             break;
-        case 4:
-            score += 800*(level+1); //'difficult'
+        case 4: //tetris
+            addFeat(1, "Tetris! +%i  \0", 8*(level+1));
+            scoreGiven += 8*(level+1);
+            break;
+        case 10: //mini t spin
+            addFeat(1, "Mini-T  +%i  \0", 1*(level+1));
+            scoreGiven += 1*(level+1);
+            break;
+        case 11: //mini t spin single
+            addFeat(2, "Mini-T Single  +%i  \0", 2*(level+1));
+            scoreGiven += 2*(level+1);
+            break;
+        case 12: //mini t spin double
+            addFeat(2, "Mini-T Double  +%i  \0", 4*(level+1));
+            scoreGiven += 4*(level+1);
+            break;
+        case 20: // t spin
+            addFeat(1, "T-Spin  +%i  \0", 4*(level+1));
+            scoreGiven += 4*(level+1);
+            break;
+        case 21: // t spin single
+            addFeat(2, "T-Spin Single  +%i  \0", 8*(level+1));
+            scoreGiven += 8*(level+1);
+            break;
+        case 22: // t spin double
+            addFeat(2, "T-Spin Double  +%i  \0", 12*(level+1));
+            scoreGiven += 12*(level+1);
+            break;
+        case 23: // t spin triple
+            addFeat(2, "T-Spin Triple  +%i  \0", 16*(level+1));
+            scoreGiven += 16*(level+1);
+            break;
+        case 101: //single perfect clear
+            addFeat(2, "Single Empty!  +%i  \0", 8*(level+1));
+            scoreGiven += 8*(level+1);
+            break;
+        case 102: //double perfect clear
+            addFeat(2, "Double Empty!  +%i  \0", 12*(level+1));
+            scoreGiven += 12*(level+1);
+            break;
+        case 103: //triple perfect clear
+            addFeat(2, "Triple Empty!  +%i  \0", 18*(level+1));
+            scoreGiven += 18*(level+1);
+            break;
+        case 104: //tetris perfect clear
+            addFeat(2, "Tetris! Empty!  +%i  \0", 20*(level+1));
+            scoreGiven += 20*(level+1);
             break;
     }
+
+    score += scoreGiven*100;
+    //char *s;// = "       \0";
+    //sprintf(s, "+%i", scoreGiven*100);
+    //addFeat(s);
+
+    //score += d;
+
+    //switch (d) {//yet to add perfect clears
+    //    case 1:
+    //        score += 100*(level+1);
+    //        break;
+    //    case 2:
+    //        score += 300*(level+1);
+    //        break;
+    //    case 3:
+    //        score += 500*(level+1);
+    //        break;
+    //    case 4:
+    //        score += 800*(level+1); //'difficult'
+    //        break;
+    //}
 
 
 
@@ -549,6 +721,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     box(win, 0, 0);
     box(nwin, 0, 0);
     box(lwin, 0, 0);
+    //box(fwin, 0, 0);
     //box(swin, 0, 0);
 
 
@@ -570,12 +743,14 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
                 break;
             }
         }
-
-        wattron(win, COLOR_PAIR(6));
-        for (int j = 0; j < 10; j++) {
-            mvwaddch(win, 3, j+1, '_');
-        }
-        wattroff(win, COLOR_PAIR(6));
+    }
+    wattron(win, COLOR_PAIR(6));
+    for (int j = 0; j < 10; j++) {
+        mvwaddch(win, 3, j+1, '_');
+    }
+    wattroff(win, COLOR_PAIR(6));
+    
+    if (paused == 0) {
         for (int i = 0; i < 24; i++) {
             for (int j = 0; j < 10; j++) {
                 if (board[i][j] != 0) {
@@ -603,6 +778,20 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
             }
         }
     }
+
+    //feat board
+    for (int i = 0; i < 20; i++) {
+        if (featLife[i] > 15 && paused == 0) {
+            if (featScores[i] != 0) {
+                mvwprintw(fwin, i, 0, featStrings[i], featScores[i]*100);
+            } else {
+                mvwaddstr(fwin, i, 0, featStrings[i]);
+            }
+        } else {
+            mvwaddstr(fwin, i, 0, "       \0");
+        }
+    }
+    
 
     
     //mvwaddstr(swin, 3, 1, "Score:");
@@ -675,8 +864,7 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     wrefresh(nwin);
     wrefresh(lwin);
     wrefresh(swin);
-
-
+    wrefresh(fwin);
 }
 
 void *mainThread() {
@@ -695,11 +883,13 @@ void *mainThread() {
     lwin = newwin(5, 6, starty, startx-6);
     nwin = newwin(13, 6, starty, startx+width+2);
     swin = newwin(6, 7, starty+12, startx+width+1);
+    fwin = newwin(20, 6, starty+5, startx-6);
     //tetronimo = rand() % 7;
 
     shuffle(tQueue, 7);
     shuffle(tQueueNext, 7);
     shuffle(tQueue, 7); //second time to remove the predictibility of RNG in first few frames of gameplay, otherwise the game would always start with the same piece usually
+    //tQueue[0] = 2;
     //endwin();
     //for (int i = 0; i < 7; i++) {
     //    printf("%i\n", tQueue[i]);
@@ -715,7 +905,8 @@ void *mainThread() {
 
     while (stop == 0) { //actual game code goes here
 
-        usleep(16667);
+        usleep(16660);
+        featUpdate();
 
         ch = chBuff[0];
 
@@ -743,6 +934,7 @@ void *mainThread() {
             mvwin(lwin, starty, startx-6);
             mvwin(nwin, starty, startx+width+2);
             mvwin(swin, starty+12, startx+width+1);
+            mvwin(fwin, starty+5, startx-6);
             erase();
             refreshboard();
                //i was getting desperate to fix a visual bug at one point -\v
@@ -874,6 +1066,8 @@ void *mainThread() {
             case KEY_LEFT: case 'a':
                 if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
                     x--;
+                    //addFeat(1, "bleh!   +000  \0");
+                    //addFeat(1, "bleh   \0");
                     rot = 0;
                     lockDelay = 0;
                     lockMoves++;
@@ -887,37 +1081,12 @@ void *mainThread() {
                         }
                     }
                 }
-                //if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
-                //    if (!checkTransform(y+1, x, rotation, tQueue[tIndex])) {
-                //        if (lockMoves >= 15) {
-                //            lock();
-                //        } else {
-                //            x--;
-                //            lockMoves++;
-                //            lockDelay = 1;
-                //            frameNo = 0;
-                //        }
-                //    } else {
-                //        x--;
-                //        lockDelay = 0;
-                //        lockMoves++;
-                //    }
-                //}
-                //if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
-                //    if (lockMoves >= 15 && !checkTransform(y+1, x, rotation, tQueue[tIndex])) {
-                //        lock();
-                //        lockMoves = 0;
-                //    } else {
-                //        x--;
-                //        lockMoves++;
-                //    }
-                //    lockDelay = 0;
-                //}
                 break;
             case KEY_UP: case 'w':
                 //rotate 
                 //y--;
-                
+                //addFeat(0, "BLEP   \0");
+                //addFeat(2, "Mini-T Double  +%i  \0", 4*(level+1));
                 for (int i = 0; i < 5; i++) {
                     //(*kicks[block])[rotation][i]
                     delta[0] = (*kickTable[tQueue[tIndex]])[rotation][i][0];
@@ -929,8 +1098,10 @@ void *mainThread() {
                         
                         if (delta[1] != 0 || delta[0] != 0) {
                             rot = 2; //now eligible for a t-spin
+                            //level = 2000;
                         } else {
                             rot = 1;
+                            //level = 1000;
                         }
                         lockDelay = 0;
                         lockMoves++;
@@ -982,6 +1153,7 @@ void *mainThread() {
                 }
                 break;
             case ' ':
+            
                 //instant drop
                 for (int i = y; i < 24; i++) {
                     if (checkTransform(i, x, rotation, tQueue[tIndex])) {
@@ -995,8 +1167,12 @@ void *mainThread() {
                 }
                 break;
             case 'c'://hold
+
                 if (hasHeld == 0) {
                     hasHeld = 1;
+                    frameNo = 0;
+                    lockMoves = 0;
+                    lockDelay = 0;
                     y = 0;
                     x = 3;
                     rotation = 0;
