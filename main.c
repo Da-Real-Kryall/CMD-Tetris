@@ -357,6 +357,7 @@ WINDOW *fwin; //for feat list
 int chBuff[5] = {0};
 int x, y;
 int level;
+bool starting = 1;
 int grav = 60;
 int hold; //block being held
 bool hasHeld;
@@ -723,147 +724,179 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     box(lwin, 0, 0);
     //box(fwin, 0, 0);
     //box(swin, 0, 0);
-
-
-    //preview insta drop
-    if (paused == 0) {
-        for (int e = y; e < 24; e++) {
-            if (checkTransform(e, x, rotation, tQueue[tIndex])) {
-                continue;
-            } else {
-                for (int i = 0; i < 4; i++) {
-                    for (int j = 0; j < 4; j++) {
-                        if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
-                            //wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
-                            mvwaddch(win, e+i, x+j+1, '.');
-                            //wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    }
     wattron(win, COLOR_PAIR(6));
     for (int j = 0; j < 10; j++) {
         mvwaddch(win, 3, j+1, '_');
     }
     wattroff(win, COLOR_PAIR(6));
-    
-    if (paused == 0) {
-        for (int i = 0; i < 24; i++) {
-            for (int j = 0; j < 10; j++) {
-                if (board[i][j] != 0) {
-                    //if (paused == 1) {
-                    //    mvwaddch(win, i+1, j+1, '#');
-                    //} else {
-                    wattron(win, COLOR_PAIR(board[i][j]));
-                    mvwaddch(win, i+1, j+1, charRef[board[i][j]-1]);
-                    wattroff(win, COLOR_PAIR(board[i][j]));
-                    //}
-                }
-            }
-        }
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
-                    if (lockDelay != 0) {
-                        wattron(win, A_BOLD);
+
+    if (starting == 0) {
+
+        //preview insta drop
+        if (paused == 0) {
+            for (int e = y; e < 24; e++) {
+                if (checkTransform(e, x, rotation, tQueue[tIndex])) {
+                    continue;
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        for (int j = 0; j < 4; j++) {
+                            if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                                //wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                                mvwaddch(win, e+i, x+j+1, '.');
+                                //wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                            }
+                        }
                     }
-                    wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
-                    mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
-                    wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
-                    wattroff(win, A_BOLD);
+                    break;
                 }
             }
         }
-    }
 
-    //feat board
-    for (int i = 0; i < 20; i++) {
-        if (featLife[i] > 15 && paused == 0) {
-            if (featScores[i] != 0) {
-                mvwprintw(fwin, i, 0, featStrings[i], featScores[i]*100);
+        if (paused == 0) {
+            for (int i = 0; i < 24; i++) {
+                for (int j = 0; j < 10; j++) {
+                    if (board[i][j] != 0) {
+                        //if (paused == 1) {
+                        //    mvwaddch(win, i+1, j+1, '#');
+                        //} else {
+                        wattron(win, COLOR_PAIR(board[i][j]));
+                        mvwaddch(win, i+1, j+1, charRef[board[i][j]-1]);
+                        wattroff(win, COLOR_PAIR(board[i][j]));
+                        //}
+                    }
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                for (int j = 0; j < 4; j++) {
+                    if ((*ref[tQueue[tIndex]])[rotation][i][j] != 0) {
+                        if (lockDelay != 0) {
+                            wattron(win, A_BOLD);
+                        }
+                        wattron(win, COLOR_PAIR(tQueue[tIndex]+1));
+                        mvwaddch(win, y+1+i, x+1+j, charRef[tQueue[tIndex]]);
+                        wattroff(win, COLOR_PAIR(tQueue[tIndex]+1));
+                        wattroff(win, A_BOLD);
+                    }
+                }
+            }
+        }
+
+        //feat board
+        for (int i = 0; i < 20; i++) {
+            if (featLife[i] > 15 && paused == 0) {
+                if (featScores[i] != 0) {
+                    mvwprintw(fwin, i, 0, featStrings[i], featScores[i]*100);
+                } else {
+                    mvwaddstr(fwin, i, 0, featStrings[i]);
+                }
             } else {
-                mvwaddstr(fwin, i, 0, featStrings[i]);
+                mvwaddstr(fwin, i, 0, "       \0");
             }
-        } else {
-            mvwaddstr(fwin, i, 0, "       \0");
         }
-    }
-    
 
-    
-    //mvwaddstr(swin, 3, 1, "Score:");
-   // mvwprintw(swin, 4, 1, "%i", score);
-    //mvwprintw(nwin, 3, 2, "%i", hold);
-    
-    //level
-    mvwaddstr(swin, 1, 1, "LEVEL:");
-    mvwprintw(swin, 2, 1, "%i", level+1);//level+1);
 
-    //score display
-    mvwaddstr(swin, 4, 1, "SCORE:");
-    mvwprintw(swin, 5, 1, "%i", score);
 
-    
-    //hold
-    //mvaddstr(starty+2, startx+width+4, "hold:");
-    mvwaddstr(lwin, 0, 1, "HOLD");
-    if (hold != -1) {
-        int r = 1;
-        if (hold == 1 || hold == 0) {
-            r = 0;
-        }
-        for (int i = 1; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                if ((*ref[hold])[r][(i-1+r)%4][j] != 0 && paused == 0) {
-                    wattron(lwin, COLOR_PAIR(hold+1));
-                    mvwaddch(lwin, i, j+1, charRef[hold]);
-                    wattroff(lwin, COLOR_PAIR(hold+1));
-                } else {
-                    mvwaddch(lwin, i, j+1, ' ');
+        //mvwaddstr(swin, 3, 1, "Score:");
+        //mvwprintw(swin, 4, 1, "%i", score);
+        //mvwprintw(nwin, 3, 2, "%i", hold);
+
+        //level
+        mvwaddstr(swin, 1, 1, "LEVEL:");
+        mvwprintw(swin, 2, 1, "%i", level+1);//level+1);
+
+        //score display
+        mvwaddstr(swin, 4, 1, "SCORE:");
+        mvwprintw(swin, 5, 1, "%i", score);
+
+
+        //hold
+        //mvaddstr(starty+2, startx+width+4, "hold:");
+        mvwaddstr(lwin, 0, 1, "HOLD");
+        if (hold != -1) {
+            int r = 1;
+            if (hold == 1 || hold == 0) {
+                r = 0;
+            }
+            for (int i = 1; i < 4; i++) {
+                for (int j = 0; j < 4; j++) {
+                    if ((*ref[hold])[r][(i-1+r)%4][j] != 0 && paused == 0) {
+                        wattron(lwin, COLOR_PAIR(hold+1));
+                        mvwaddch(lwin, i, j+1, charRef[hold]);
+                        wattroff(lwin, COLOR_PAIR(hold+1));
+                    } else {
+                        mvwaddch(lwin, i, j+1, ' ');
+                    }
                 }
             }
         }
-    }
 
-    //next block
-    mvwaddstr(nwin, 0, 1, "NEXT"); //display next 3 blocks
-    for (int k = 0; k < 3; k++) {
-        for (int i = 1; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                int nextTetramino;
-                int r = 1;
-                //printf("%i\n", tIndex);
-                if (tIndex+k >= 6) {
-                    nextTetramino = tQueueNext[(tIndex+k)%6];
-                } else {
-                    nextTetramino = tQueue[(tIndex+k)+1];
-                }
-                if (nextTetramino == 1 || nextTetramino == 0) {
-                    r = 0;
-                }
-                if ((*ref[nextTetramino])[r][(i-1+r)%4][j] != 0 && paused == 0) {
-                    wattron(nwin, COLOR_PAIR(nextTetramino+1));
-                    mvwaddch(nwin, i+4*k, j+1, charRef[nextTetramino]);
-                    wattroff(nwin, COLOR_PAIR(nextTetramino+1));
-                } else {
-                    mvwaddch(nwin, i+4*k, j+1, ' ');
+        //next block
+        mvwaddstr(nwin, 0, 1, "NEXT"); //display next 3 blocks
+        for (int k = 0; k < 3; k++) {
+            for (int i = 1; i < 4; i++) {
+                for (int j = 0; j < 4; j++) {
+                    int nextTetramino;
+                    int r = 1;
+                    //printf("%i\n", tIndex);
+                    if (tIndex+k >= 6) {
+                        nextTetramino = tQueueNext[(tIndex+k)%6];
+                    } else {
+                        nextTetramino = tQueue[(tIndex+k)+1];
+                    }
+                    if (nextTetramino == 1 || nextTetramino == 0) {
+                        r = 0;
+                    }
+                    if ((*ref[nextTetramino])[r][(i-1+r)%4][j] != 0 && paused == 0) {
+                        wattron(nwin, COLOR_PAIR(nextTetramino+1));
+                        mvwaddch(nwin, i+4*k, j+1, charRef[nextTetramino]);
+                        wattroff(nwin, COLOR_PAIR(nextTetramino+1));
+                    } else {
+                        mvwaddch(nwin, i+4*k, j+1, ' ');
+                    }
                 }
             }
         }
-    }
 
-    if (paused == 1) {
-        mvwaddstr(win, 12, 2, "<PAUSED>");
+        if (paused == 1) {
+            mvwaddstr(win, 12, 2, "<PAUSED>");
+        }
+    } else {
+        wattron(fwin, COLOR_PAIR(1));
+        mvwaddstr(fwin, 17, 1, "made\n  by\n kryal");
+        wattroff(fwin, COLOR_PAIR(1));
+
+        wattron(win, A_BLINK);
+        mvwaddstr(win, 18, 1, " space to");
+        mvwaddstr(win, 19, 1, "  start!");
+        wattroff(win, A_BLINK);
+
+        mvwaddstr(lwin, 0, 1, "HOLD");
+        mvwaddstr(swin, 1, 1, "LEVEL: 0");
+        mvwaddstr(swin, 4, 1, "SCORE: 0");
+        mvwaddstr(nwin, 0, 1, "NEXT");
+        
+        wattron(win, A_BOLD);
+        mvwaddstr(win, 1, 1, " CMD-");
+        mvwaddstr(win, 2, 1, "  Tetris!");
+
+        mvwaddstr(win, 6, 1, "Controls:");
+        wattroff(win, A_BOLD);
+
+        mvwaddstr(win, 7, 1, "r:RECENTRE");
+        mvwaddstr(win, 8, 1, ":H-Drop");
+        mvwaddstr(win, 9, 1, "w:Rotate");
+        mvwaddstr(win, 10, 1, "a:MoveLt");
+        mvwaddstr(win, 11, 1, "s:S-Drop");
+        mvwaddstr(win, 12, 1, "d:MoveRt");
+        mvwaddstr(win, 13, 1, "c:Hold");
+        mvwaddstr(win, 14, 1, "p:Pause");
     }
 
     //refresh();
+    wrefresh(swin);
     wrefresh(win);
     wrefresh(nwin);
     wrefresh(lwin);
-    wrefresh(swin);
     wrefresh(fwin);
 }
 
@@ -874,6 +907,7 @@ void *mainThread() {
     rotation = 0;
     level = 0;
     hold = -1;
+    //stop = 1;
     //score = 1234567890;
     height = 24;
     width = 10;
@@ -884,13 +918,92 @@ void *mainThread() {
     nwin = newwin(13, 6, starty, startx+width+2);
     swin = newwin(6, 7, starty+12, startx+width+1);
     fwin = newwin(20, 6, starty+5, startx-6);
-    //tetronimo = rand() % 7;
+    usleep(100000);
+    refreshboard(); //idk why i have to do this twice but oke
+    refreshboard();
+
+    //draw beginning screen...
+    //" Press    \n any key  \n to begin."
+    //
+    //"Press any "
+    //"Key to    "
+    //"Begin...  "
+
+
+
+//char bleh[] = " \
+//│Controls: │  \
+//│r:RECENTRE│  \
+//│' ':H-Drop│  \
+//│w:Rotate  │  \
+//│a:MoveLeft│  \
+//│s:Sft-Drop|  \
+//│d:MoveRigt│  \
+//│c:Hold    │  \
+//│p:PauseTgl│  \
+//";
+    //mini loop before game starts
+    ch = chBuff[0];
+    while (ch != ' ') { //actual game code goes here
+
+        usleep(16660);
+
+        ch = chBuff[0];
+
+        if (ch == 'r') {
+            //refreshboard();
+            //height = 24;
+            //width = 10;
+            //starty = (0);
+            starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;
+            startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;
+            mvwin(win, starty, startx);
+            wresize(win, height+2, width+2);
+            mvwin(lwin, starty, startx-6);
+            mvwin(nwin, starty, startx+width+2);
+            mvwin(swin, starty+12, startx+width+1);
+            mvwin(fwin, starty+5, startx-6);
+            erase();
+            refreshboard();
+        }
+        //remove from output buffer
+        for (int i = 0; i < 4; i++) {
+            chBuff[i] = chBuff[i+1];
+        }
+           
+    }
+
+    { //do start animation
+        werase(win);
+        box(win, 0, 0);
+        wattron(win, COLOR_PAIR(6));
+        for (int j = 0; j < 10; j++) {
+            mvwaddch(win, 3, j+1, '_');
+        }
+        wattroff(win, COLOR_PAIR(6));
+        mvwaddstr(win, 12, 5, "3..");
+        wrefresh(win);
+        usleep(500000);
+        mvwaddstr(win, 12, 5, "2..");
+        wrefresh(win);
+        //2
+        usleep(500000);
+        mvwaddstr(win, 12, 5, "1..");
+        wrefresh(win);
+        //1
+        usleep(500000);
+        mvwaddstr(win, 12, 5, "GO!");
+        wrefresh(win);
+        //go!
+        usleep(500000);
+        mvwaddstr(win, 12, 5, "   ");
+        wrefresh(win);
+        starting = 0;
+    }
 
     shuffle(tQueue, 7);
     shuffle(tQueueNext, 7);
     shuffle(tQueue, 7); //second time to remove the predictibility of RNG in first few frames of gameplay, otherwise the game would always start with the same piece usually
-    //tQueue[0] = 2;
-    //endwin();
     //for (int i = 0; i < 7; i++) {
     //    printf("%i\n", tQueue[i]);
     //}
@@ -914,6 +1027,7 @@ void *mainThread() {
         for (int i = 0; i < 4; i++) {
             chBuff[i] = chBuff[i+1];
         }
+
             //wclear(win);
             //werase(win);
             //wclear(stdscr);
@@ -1044,6 +1158,7 @@ void *mainThread() {
             //    mvwin(nwin, starty, startx+width+1);
             //    break;
             case KEY_RIGHT: case 'd':
+                //addFeat(0, "BLEP   \0", 0);
                 if (checkTransform(y, x+1, rotation, tQueue[tIndex])) {
                     x++;
                     rot = 0;
@@ -1064,9 +1179,10 @@ void *mainThread() {
                 }
                 break;
             case KEY_LEFT: case 'a':
+                //addFeat(1, "BLEP   BLEEP  \0", 0);
                 if (checkTransform(y, x-1, rotation, tQueue[tIndex])) {
                     x--;
-                    //addFeat(1, "bleh!   +000  \0");
+                    //addFeat(1, "bleh!   +000  \0", 0);
                     //addFeat(1, "bleh   \0");
                     rot = 0;
                     lockDelay = 0;
@@ -1085,7 +1201,7 @@ void *mainThread() {
             case KEY_UP: case 'w':
                 //rotate 
                 //y--;
-                //addFeat(0, "BLEP   \0");
+                //addFeat(0, "BLEP   \0", 0);
                 //addFeat(2, "Mini-T Double  +%i  \0", 4*(level+1));
                 for (int i = 0; i < 5; i++) {
                     //(*kicks[block])[rotation][i]
