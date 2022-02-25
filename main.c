@@ -717,6 +717,7 @@ void lock() { //locks the currently active tetronimo to the board and does other
     
 }
 
+
 void refreshboard() { //prints everything     ~~prints the currently saved board, NOT the currently active tetronimo~~
     werase(win);
     box(win, 0, 0);
@@ -900,6 +901,28 @@ void refreshboard() { //prints everything     ~~prints the currently saved board
     wrefresh(fwin);
 }
 
+void recentre() {
+    starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;
+    startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;
+    mvwin(win, starty, startx);
+    wresize(win, height+2, width+2);
+
+    mvwin(lwin, starty, startx-6);
+    wresize(lwin, 5, 6);
+
+    mvwin(nwin, starty, startx+width+2);
+    wresize(nwin, 13, 6);
+
+    mvwin(swin, starty+12, startx+width+1);
+    wresize(swin, 6, 7);
+
+    mvwin(fwin, starty+5, startx-6);
+    wresize(fwin, 20, 6);
+
+    erase();
+    refreshboard();
+}
+
 void *mainThread() {
     y = 0;
     x = 3;
@@ -955,16 +978,7 @@ void *mainThread() {
             //height = 24;
             //width = 10;
             //starty = (0);
-            starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;
-            startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;
-            mvwin(win, starty, startx);
-            wresize(win, height+2, width+2);
-            mvwin(lwin, starty, startx-6);
-            mvwin(nwin, starty, startx+width+2);
-            mvwin(swin, starty+12, startx+width+1);
-            mvwin(fwin, starty+5, startx-6);
-            erase();
-            refreshboard();
+            recentre();
         }
         //remove from output buffer
         for (int i = 0; i < 4; i++) {
@@ -1041,16 +1055,7 @@ void *mainThread() {
             //height = 24;
             //width = 10;
             //starty = (0);
-            starty = (LINES - height) / 2 - 1 > 0 ? (LINES - height) / 2 - 1 : 0;
-            startx = (COLS - width) / 2 - 1 > 0 ? (COLS - width) / 2 - 1 : 0;
-            mvwin(win, starty, startx);
-            wresize(win, height+2, width+2);
-            mvwin(lwin, starty, startx-6);
-            mvwin(nwin, starty, startx+width+2);
-            mvwin(swin, starty+12, startx+width+1);
-            mvwin(fwin, starty+5, startx-6);
-            erase();
-            refreshboard();
+            recentre();
                //i was getting desperate to fix a visual bug at one point -\v
             //redrawwin(win);
             //redrawwin(lwin);
